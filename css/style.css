@@ -482,7 +482,15 @@ section.callaction {
 	padding:50px 0 0 0;
 }
 
-
+.links {
+	color:#516b66;
+	font-weight:700;
+	font-family: 'Open Sans', Arial, sans-serif;
+}
+.links:hover {
+	color:#14A085;
+	text-decoration:none;
+}
 
 /* Content
 ==================================== */
