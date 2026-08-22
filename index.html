@@ -1,21 +1,28 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NVR - Ao Vivo</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#000;color:#fff;font-family:Arial;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}
-  h1{font-size:16px;opacity:.6;margin-bottom:12px}
-  iframe{width:95vw;max-width:1280px;height:72vh;background:#111;border:1px solid #222;border-radius:12px}
-  #status{margin-top:10px;font-family:monospace;font-size:12px;background:#111;border:1px solid #222;padding:6px 14px;border-radius:20px}
-  .on{color:#00ff88}
-</style>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NVR Ao Vivo</title>
+<style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}video{width:95vw;max-width:1280px;background:#111;border-radius:12px}</style>
 </head>
 <body>
-<h1>Mosaico Desktop - Ao Vivo</h1>
-<iframe id="player" src="https://roughly-aruba-emma-reached.trycloudflare.com/stream.html?src=desktop&mode=mse" allow="autoplay; fullscreen" allowfullscreen></iframe>
-<div id="status"><span class="on">●</span> AO VIVO - https://roughly-aruba-emma-reached.trycloudflare.com</div>
+<video id="v" autoplay muted playsinline controls style="width:95vw;height:72vh"></video>
+<script type="module">
+const TUNEL = "https://roughly-aruba-emma-reached.trycloudflare.com";
+const video = document.getElementById('v');
+async function start(){
+  const pc = new RTCPeerConnection();
+  pc.addTransceiver('video', {direction:'recvonly'});
+  pc.ontrack = e => video.srcObject = e.streams[0];
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  const res = await fetch(`${TUNEL}/api/whep?src=desktop`, {
+    method:'POST',
+    headers:{'Content-Type':'application/sdp'},
+    body: offer.sdp
+  });
+  const answer = await res.text();
+  await pc.setRemoteDescription({type:'answer', sdp: answer});
+}
+start();
+</script>
 </body>
 </html>
