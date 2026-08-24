@@ -1,28 +1,128 @@
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NVR Ao Vivo</title>
-<style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}video{width:95vw;max-width:1280px;background:#111;border-radius:12px}</style>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoramento Ao Vivo</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0f1115;color:#fff;font-family:Inter,Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#181b22;border:1px solid #2a2f3a;border-radius:16px;padding:28px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+  h1{font-size:22px;margin-bottom:6px}
+  .sub{color:#8b93a1;font-size:13px;margin-bottom:20px}
+  #login{display:block}
+  #content{display:none}
+  input{width:100%;padding:14px;border-radius:10px;border:1px solid #2a2f3a;background:#0f1115;color:#fff;font-size:16px;letter-spacing:2px;text-align:center}
+  button{width:100%;margin-top:12px;padding:14px;border-radius:10px;border:0;background:#3b82f6;color:#fff;font-weight:700;cursor:pointer;font-size:15px}
+  button:hover{background:#2563eb}
+  .error{color:#ef4444;font-size:13px;margin-top:10px;display:none;text-align:center}
+  .grid{display:grid;gap:12px;margin-top:16px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  .cam-wrap{position:relative;background:#000;border-radius:12px;overflow:hidden;border:1px solid #2a2f3a;aspect-ratio:16/9}
+  .cam-wrap video{width:100%;height:100%;object-fit:cover}
+  .label{position:absolute;top:8px;left:8px;background:rgba(239,68,68,.9);color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:20px;letter-spacing:.5px}
+  .label.live::before{content:'';display:inline-block;width:6px;height:6px;background:#fff;border-radius:50%;margin-right:4px;animation:pulse 1.2s infinite}
+  @keyframes pulse{0%{opacity:1}50%{opacity:.4}100%{opacity:1}}
+  .top{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);font-size:11px;padding:4px 8px;border-radius:20px}
+  .footer{margin-top:16px;color:#6b7280;font-size:11px;text-align:center}
+  .footer span{color:#9ca3af}
+</style>
 </head>
 <body>
-<video id="v" autoplay muted playsinline controls style="width:95vw;height:72vh"></video>
-<script type="module">
-const TUNEL = "https://roughly-aruba-emma-reached.trycloudflare.com";
-const video = document.getElementById('v');
-async function start(){
-  const pc = new RTCPeerConnection();
-  pc.addTransceiver('video', {direction:'recvonly'});
-  pc.ontrack = e => video.srcObject = e.streams[0];
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  const res = await fetch(`${TUNEL}/api/whep?src=desktop`, {
-    method:'POST',
-    headers:{'Content-Type':'application/sdp'},
-    body: offer.sdp
-  });
-  const answer = await res.text();
-  await pc.setRemoteDescription({type:'answer', sdp: answer});
+<div class="card">
+  <div id="login">
+    <h1>🔒 Acesso Restrito</h1>
+    <p class="sub">Monitoramento ao vivo. Digite a senha para visualizar.</p>
+    <input type="password" id="pass" placeholder="••••" maxlength="10" autofocus>
+    <button onclick="check()">Acessar câmeras</button>
+    <div id="err" class="error">Senha incorreta. Tente novamente.</div>
+    <div class="footer">Ambiente monitorado 24h • Transmissão ao vivo sem gravação</div>
+  </div>
+
+  <div id="content">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h1>Monitoramento Ao Vivo</h1>
+        <p class="sub">Imagens em tempo real • <span id="hora"></span> • Sem armazenamento</p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="cam-wrap">
+        <video id="v1" autoplay muted playsinline controls></video>
+      </div>
+     
+    </div>
+    <div class="footer">Acesso protegido por senha • As imagens não são gravadas neste portal • <span>LGPD - Aviso de monitoramento</span></div>
+  </div>
+</div>
+
+<script>
+const SENHA = "1005";
+const SERVERS = [
+  "http://localhost:8888",
+  "https://flashing-cave-extension-gps.trycloudflare.com" // troque pelo IP do PC que roda o MediaMTX se acessar de outro PC
+];
+
+function getServer(){
+  // tenta localhost, se falhar usa IP da rede - ajuste conforme seu caso
+  return location.hostname === "localhost" || location.hostname === "127.0.0.1" ? SERVERS[0] : SERVERS[0];
 }
-start();
+
+function check(){
+  const v = document.getElementById('pass').value;
+  if(v === SENHA){
+    document.getElementById('login').style.display='none';
+    document.getElementById('content').style.display='block';
+    startPlayers();
+    localStorage.setItem('auth_cam','ok');
+  } else {
+    document.getElementById('err').style.display='block';
+  }
+}
+function logout(){
+  localStorage.removeItem('auth_cam');
+  location.reload();
+}
+function startPlayers(){
+  // MUDE AQUI: se você usou OBS -> cam5, se usou transcodificação ffmpeg -> cam5_h264
+  ligar('v1','cam5');
+  ligar('v2','cam2'); // se cam2 não existir vai ficar carregando, pode remover
+}
+
+function ligar(videoId, path){
+  const video = document.getElementById(videoId);
+  const base = getServer();
+  const src = `${base}/${path}/index.m3u8`;
+  if(Hls.isSupported()){
+    const hls = new Hls({liveSyncDurationCount:2, liveMaxLatencyDurationCount:5});
+    hls.loadSource(src);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.ERROR, function(event,data){
+      console.log(data);
+    });
+  } else if(video.canPlayType('application/vnd.apple.mpegurl')){
+    video.src = src;
+  }
+}
+
+document.getElementById('pass').addEventListener('keydown', e=>{
+  if(e.key==='Enter') check();
+});
+
+setInterval(()=>{
+  const d = new Date();
+  const el = document.getElementById('hora');
+  if(el) el.textContent = d.toLocaleString('pt-BR');
+},1000);
+
+// auto-login se já digitou antes
+if(localStorage.getItem('auth_cam')==='ok'){
+  document.getElementById('login').style.display='none';
+  document.getElementById('content').style.display='block';
+  startPlayers();
+}
 </script>
 </body>
 </html>
